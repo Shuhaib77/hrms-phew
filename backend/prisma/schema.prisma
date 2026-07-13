@@ -1,0 +1,655 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  HR_MANAGER
+  MANAGER
+  EMPLOYEE
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  PAID
+  UNPAID
+  OPTIONAL
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  APPROVED
+  REJECTED
+  MANUALLY_OVERRIDDEN
+}
+
+enum PayrollMode {
+  STRICT
+  SIMPLE
+}
+
+enum PayPeriodType {
+  MONTHLY
+  SEMI_MONTHLY
+  BI_WEEKLY
+}
+
+enum DisputeStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+enum AdjustmentType {
+  BONUS
+  REIMBURSEMENT
+  DEDUCTION
+  CORRECTION
+  OVERTIME
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectStatus {
+  ACTIVE
+  DELIVERED
+  ON_HOLD
+  CANCELLED
+}
+
+enum PayPeriodStatus {
+  DRAFT
+  FINALIZED
+  PAID
+}
+
+enum NotificationType {
+  PAYSLIP_READY
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  LEAVE_REQUESTED
+  ATTENDANCE_REJECTED
+  ATTENDANCE_OVERRIDDEN
+  TASK_ASSIGNED
+  PROJECT_DELIVERED
+  EOM_SELECTED
+  PENALTY_APPLIED
+  DISPUTE_RAISED
+  DISPUTE_RESOLVED
+  OVERTIME_APPROVED
+  OVERTIME_REJECTED
+  INCOMPLETE_PUNCH
+  GENERAL
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  avatar        String?
+  role          Role     @default(EMPLOYEE)
+  isActive      Boolean  @default(true)
+  employeeId    String   @unique
+  designation   String?
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  managerId     String?
+  manager       User?    @relation("ManagerSubordinates", fields: [managerId], references: [id])
+  subordinates  User[]   @relation("ManagerSubordinates")
+  dateOfJoining DateTime?
+  dateOfBirth   DateTime?
+  address       String?
+  emergencyContact String?
+  emergencyPhone  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  assignedLocations EmployeeLocationAssignment[]
+  attendanceRecords  Attendance[]
+  performanceReviews PerformanceReview[]
+  assignedTasks     TaskAssignee[]
+  leaveRequests     LeaveRequest[]
+  payslips          Payslip[]
+  notifications     Notification[]
+  projectRoles      ProjectMember[]
+  eomWins           EmployeeOfTheMonth[]
+  eomAdminActions   EmployeeOfTheMonth[] @relation("AdminEOM")
+
+  departmentHead        Department?             @relation("DepartmentHead")
+  attendanceOverrides   Attendance[]             @relation("AttendanceOverride")
+  incompletePunchResolutions Attendance[]         @relation("IncompletePunchResolver")
+  policyUpdates         AttendancePolicy[]       @relation("PolicyUpdater")
+  leaveApprovals        LeaveRequest[]           @relation("LeaveApprover")
+  leaveBalances         LeaveBalance[]
+  projectsDelivered     Project[]                @relation("ProjectDeliveredBy")
+  projectsCreated       Project[]                @relation("ProjectCreator")
+  tasksCreated          Task[]                   @relation("TaskCreator")
+  reviewsGiven          PerformanceReview[]      @relation("PerformanceReviewer")
+  overtimeApprovals     OvertimeRecord[]         @relation("OvertimeApprover")
+  disputeResolutions    Dispute[]                @relation("DisputeResolver")
+  salaryStructures      SalaryStructure[]
+  payslipsGenerated     Payslip[]                @relation("PayslipGenerator")
+  updatedCompanySettings CompanySettings[]      @relation("CompanySettingsUpdater")
+  userOvertimeRecords   OvertimeRecord[]         @relation("OvertimeRecordUser")
+  createdAdjustments    OneOffAdjustment[]       @relation("AdjustmentCreator")
+  raisedDisputes        Dispute[]                @relation("DisputeRaisedBy")
+  announcements         Announcement[]
+  auditLogs             AuditLog[]
+
+  @@index([email])
+  @@index([departmentId])
+  @@index([managerId])
+  @@index([role])
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  headId    String?   @unique
+  head      User?     @relation("DepartmentHead", fields: [headId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+
+  @@index([headId])
+}
+
+model Location {
+  id                      String   @id @default(uuid())
+  name                    String
+  address                 String?
+  latitude                Float
+  longitude               Float
+  radius                  Int      @default(100)
+  isActive                Boolean  @default(true)
+  isWifiVerificationEnabled Boolean @default(false)
+  wifiBssids              Json     @default("[]")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  employeeAssignments EmployeeLocationAssignment[]
+  attendanceRecords   Attendance[]
+  holidays            Holiday[]
+
+  @@index([isActive])
+}
+
+model EmployeeLocationAssignment {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, locationId])
+  @@index([userId])
+  @@index([locationId])
+}
+
+model Attendance {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  type            String
+  timestamp       DateTime         @default(now())
+  date            DateTime
+  latitude        Float?
+  longitude       Float?
+  locationId      String?
+  location        Location?        @relation(fields: [locationId], references: [id])
+  selfiePath      String?
+  status          AttendanceStatus @default(APPROVED)
+  rejectionReason String?
+  overrideNote    String?
+  overrideById    String?
+  overrideBy      User?            @relation("AttendanceOverride", fields: [overrideById], references: [id])
+  isLate             Boolean          @default(false)
+  lateMinutes        Int              @default(0)
+  isIncompletePunch  Boolean          @default(false)
+  resolvedAt         DateTime?
+  resolvedById       String?
+  resolvedBy         User?            @relation("IncompletePunchResolver", fields: [resolvedById], references: [id])
+  resolutionNote     String?
+  distanceFromSite   Float?
+  wifiBssid          String?
+  ipAddress       String?
+  userAgent       String?
+  disputes        Dispute[]
+
+  createdAt       DateTime         @default(now())
+
+  @@index([userId])
+  @@index([userId, date])
+  @@index([date])
+  @@index([locationId])
+  @@index([status])
+}
+
+model AttendancePolicy {
+  id                          String   @id @default(uuid())
+  shiftStartTime              String   @default("09:00")
+  gracePeriodMinutes          Int      @default(15)
+  allowedLatesPerWeek         Int      @default(3)
+  allowedLatesPerMonth        Int      @default(10)
+  penaltyType                 String   @default("flat")
+  penaltyAmount               Float    @default(100)
+  penaltyPercentage           Float    @default(0.05)
+  isGeofencingEnabled         Boolean  @default(true)
+  isWifiVerificationEnabled   Boolean  @default(false)
+  isPhotoRequired             Boolean  @default(true)
+  enableEscalatingPenalties   Boolean  @default(false)
+  escalatingTier2After        Int      @default(6)
+  escalatingTier2Amount       Float    @default(250)
+  escalatingTier3After        Int      @default(10)
+  escalatingTier3Amount       Float    @default(500)
+  halfDayExemptFromLatePenalty Boolean @default(false)
+  updatedById                 String?
+  updatedBy                   User?    @relation("PolicyUpdater", fields: [updatedById], references: [id])
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}
+
+model CompanySettings {
+  id                String       @id @default(uuid())
+  companyName       String       @default("Phew HRMS")
+  currency          String       @default("INR")
+  payrollMode       PayrollMode  @default(SIMPLE)
+  payPeriod         PayPeriodType @default(MONTHLY)
+  weekStartDay      Int          @default(1)
+  standardWorkHours Float        @default(8.0)
+  standardWorkDays  Int          @default(22)
+  updatedById       String?
+  updatedBy         User?        @relation("CompanySettingsUpdater", fields: [updatedById], references: [id])
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model LeaveRequest {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  type        LeaveType
+  status      LeaveStatus @default(PENDING)
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  approverId  String?
+  approver    User?       @relation("LeaveApprover", fields: [approverId], references: [id])
+  comment     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model LeaveBalance {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      LeaveType
+  total     Float     @default(0)
+  used      Float     @default(0)
+  year      Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, type, year])
+  @@index([userId])
+  @@index([year])
+}
+
+model Holiday {
+  id          String   @id @default(uuid())
+  name        String
+  date        DateTime
+  type        String   @default("public")
+  isRecurring Boolean  @default(false)
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([locationId])
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  logo      String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projects  Project[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  clientId    String?
+  client      Client?       @relation(fields: [clientId], references: [id])
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Float?
+  deliveredAt DateTime?
+  deliveredById String?
+  deliveredBy   User?        @relation("ProjectDeliveredBy", fields: [deliveredById], references: [id])
+  createdById   String?
+  createdBy     User?        @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  tasks       Task[]
+  members     ProjectMember[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   @default("Member")
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Task {
+  id          String          @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus      @default(TODO)
+  priority    TaskPriority    @default(MEDIUM)
+  projectId   String?
+  project     Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  dueDate     DateTime?
+  createdById String
+  createdBy   User            @relation("TaskCreator", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  assignees   TaskAssignee[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model TaskAssignee {
+  id     String @id @default(uuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model PerformanceReview {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  reviewerId  String
+  reviewer    User     @relation("PerformanceReviewer", fields: [reviewerId], references: [id])
+  cycle       String
+  quality     Int      @default(0)
+  timeliness  Int      @default(0)
+  collaboration Int    @default(0)
+  ownership   Int      @default(0)
+  overallScore Float   @default(0)
+  feedback    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([cycle])
+}
+
+model EmployeeOfTheMonth {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  month       Int
+  year        Int
+  reason      String?
+  selectedById String?
+  selectedBy  User?    @relation("AdminEOM", fields: [selectedById], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, month, year])
+  @@index([month, year])
+  @@index([isActive])
+}
+
+model SalaryComponent {
+  id        String   @id @default(uuid())
+  name      String
+  type      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  payslipComponents PayslipComponent[]
+}
+
+model SalaryStructure {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  basic     Float    @default(0)
+  hra       Float    @default(0)
+  allowances Json    @default("{}")
+  deductions Json    @default("{}")
+  monthlyGross Float @default(0)
+  monthlyNet Float  @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([effectiveFrom])
+}
+
+model Payslip {
+  id              String          @id @default(uuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id])
+  month           Int
+  year            Int
+  basic           Float           @default(0)
+  hra             Float           @default(0)
+  allowances      Json            @default("{}")
+  deductions      Json            @default("{}")
+  additionalDeductions Json       @default("[]")
+  grossPay        Float           @default(0)
+  totalDeductions Float           @default(0)
+  netPay          Float           @default(0)
+  status          PayPeriodStatus @default(DRAFT)
+  pdfPath         String?
+  isLocked        Boolean         @default(false)
+  payrollMode     PayrollMode     @default(SIMPLE)
+  shortHours      Float           @default(0)
+  overtimeHours   Float           @default(0)
+  overtimePay     Float           @default(0)
+  generatedById   String?
+  generatedBy     User?           @relation("PayslipGenerator", fields: [generatedById], references: [id])
+  latePenalties   Json            @default("[]")
+  components      PayslipComponent[]
+  adjustments     OneOffAdjustment[]
+  overtimeRecords OvertimeRecord[]
+  disputes        Dispute[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([userId, month, year])
+  @@index([userId])
+  @@index([month, year])
+  @@index([status])
+}
+
+model PayslipComponent {
+  id          String  @id @default(uuid())
+  payslipId   String
+  payslip     Payslip @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  componentId String
+  component   SalaryComponent @relation(fields: [componentId], references: [id])
+  amount      Float
+
+  @@index([payslipId])
+}
+
+model OvertimeRecord {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation("OvertimeRecordUser", fields: [userId], references: [id])
+  date        DateTime
+  hours       Float
+  reason      String?
+  status      OvertimeStatus @default(PENDING)
+  approvedById String?
+  approvedBy   User?         @relation("OvertimeApprover", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  payslipId    String?
+  payslip      Payslip?      @relation(fields: [payslipId], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([payslipId])
+}
+
+model OneOffAdjustment {
+  id          String         @id @default(uuid())
+  payslipId   String
+  payslip     Payslip        @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  type        AdjustmentType
+  amount      Float
+  reason      String         @default("")
+  createdById String
+  createdBy   User           @relation("AdjustmentCreator", fields: [createdById], references: [id])
+  createdAt   DateTime       @default(now())
+
+  @@index([payslipId])
+}
+
+model Dispute {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation("DisputeRaisedBy", fields: [userId], references: [id])
+  payslipId     String?
+  payslip       Payslip?       @relation(fields: [payslipId], references: [id])
+  attendanceId  String?
+  attendance    Attendance?    @relation(fields: [attendanceId], references: [id])
+  reason        String
+  description   String?
+  status        DisputeStatus  @default(PENDING)
+  resolvedById  String?
+  resolvedBy    User?          @relation("DisputeResolver", fields: [resolvedById], references: [id])
+  resolution    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([payslipId])
+  @@index([status])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  message   String?
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  priority  String   @default("normal")
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@index([userId])
+}

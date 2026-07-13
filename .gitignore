@@ -1,0 +1,10 @@
+node_modules/
+.next/
+dist/
+backend/dist/
+backend/uploads/
+nohup.out
+*.log
+.env
+.env.*
+!.env.example

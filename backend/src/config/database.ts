@@ -1,0 +1,17 @@
+import { PrismaClient } from '@prisma/client';
+import { config } from './index.js';
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+
+const connectionUrl = config.database.url.includes('?')
+  ? config.database.url + '&connection_limit=10'
+  : config.database.url + '?connection_limit=10';
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  datasources: { db: { url: connectionUrl } },
+  log: config.nodeEnv === 'development' ? ['query', 'error', 'warn'] : ['error'],
+});
+
+if (config.nodeEnv !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
