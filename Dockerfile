@@ -23,4 +23,4 @@ COPY --from=builder /app/backend/src/seed.ts ./src/seed.ts
 COPY backend/scripts/ /app/scripts/
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node scripts/ensure-seeded.mjs && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node scripts/ensure-seeded.mjs && node dist/index.js"]
