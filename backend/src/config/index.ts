@@ -7,8 +7,14 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'fallback-secret-do-not-use-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(s => s.trim()),
   uploadDir: process.env.UPLOAD_DIR || './uploads',
   companyName: process.env.COMPANY_NAME || 'Phew HRMS',
+  cloudinary: {
+    cloudName: process.env.CLOUD_NAME || '',
+    apiKey: process.env.CLOUD_API || '',
+    apiSecret: process.env.CLOUD_SECRET || '',
+  },
   database: {
     url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/phew_hrms',
   },
@@ -25,7 +31,7 @@ export const config = {
   },
 };
 
-const required = ['JWT_SECRET', 'DATABASE_URL'];
+const required = ['JWT_SECRET', 'DATABASE_URL', 'CLOUD_NAME', 'CLOUD_API', 'CLOUD_SECRET'];
 for (const key of required) {
   if (!process.env[key]) {
     throw new Error(`Missing required environment variable: ${key}`);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge, Input, Select, Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Modal, Skeleton } from '@/components/ui';
 import { Topbar } from '@/components/layout/topbar';
-import { api } from '@/lib/api';
+import { api, API_BASE } from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { formatCurrency, getStatusLabel } from '@/lib/utils';
 import { Download, Plus, FileText, Settings, DollarSign, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
@@ -102,8 +102,7 @@ export default function PayrollPage() {
 
   const handleDownload = (id: string) => {
     const token = localStorage.getItem('phew-hrms-auth') ? JSON.parse(localStorage.getItem('phew-hrms-auth') || '{}')?.state?.token : '';
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-    window.open(baseUrl + '/payroll/my-payslips/' + id + '/download?token=' + token, '_blank');
+    window.open(API_BASE + '/payroll/my-payslips/' + id + '/download?token=' + encodeURIComponent(token), '_blank');
   };
 
   const handleGenerate = async () => {

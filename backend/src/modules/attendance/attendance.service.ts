@@ -1,9 +1,7 @@
 import { prisma } from '../../config/database.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { haversineDistance, calculateLateMinutes, calculatePenalty, stripExif } from '../../shared/utils.js';
-import fs from 'fs';
-import path from 'path';
-import { config } from '../../config/index.js';
+import { uploadImage } from '../../utils/cloudinary.js';
 
 export class AttendanceService {
   async punch(
@@ -48,10 +46,8 @@ export class AttendanceService {
 
     let selfiePath: string | undefined;
     if (data.selfieFile) {
-      const buffer = fs.readFileSync(data.selfieFile.path);
-      const stripped = await stripExif(buffer);
-      fs.writeFileSync(data.selfieFile.path, stripped);
-      selfiePath = data.selfieFile.path;
+      const stripped = await stripExif(data.selfieFile.buffer);
+      selfiePath = await uploadImage(stripped, 'attendance');
     }
 
     let matchedLocationId = data.locationId;
