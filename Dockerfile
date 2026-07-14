@@ -11,7 +11,7 @@ RUN npm run build --workspace=backend
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache tzdata openssl libssl3
 ENV NODE_ENV=production
 
 COPY --from=builder /app/backend/dist ./dist
