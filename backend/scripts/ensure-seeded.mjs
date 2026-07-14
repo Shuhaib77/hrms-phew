@@ -15,6 +15,33 @@ async function main() {
     console.log('[seed] Database seeded successfully.');
   }
 
+  // Ensure attendance policy exists (needed for check-in)
+  const existingPolicy = await prisma.attendancePolicy.findFirst();
+  if (!existingPolicy) {
+    console.log('[seed] Creating default attendance policy...');
+    const adminUser = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    await prisma.attendancePolicy.create({
+      data: {
+        shiftStartTime: '09:00',
+        gracePeriodMinutes: 15,
+        allowedLatesPerWeek: 3,
+        allowedLatesPerMonth: 10,
+        penaltyType: 'flat',
+        penaltyAmount: 100,
+        penaltyPercentage: 0.05,
+        isGeofencingEnabled: true,
+        isPhotoRequired: true,
+        enableEscalatingPenalties: true,
+        escalatingTier2After: 6,
+        escalatingTier2Amount: 250,
+        escalatingTier3After: 10,
+        escalatingTier3Amount: 500,
+        updatedById: adminUser?.id || undefined,
+      },
+    });
+    console.log('[seed] Default attendance policy created.');
+  }
+
   const customUser = await prisma.user.findUnique({ where: { email: 'shuhaib@123.com' } });
   if (!customUser) {
     console.log('[seed] Creating shuhaib@123.com user...');
