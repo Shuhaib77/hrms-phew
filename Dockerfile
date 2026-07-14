@@ -19,6 +19,8 @@ COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/package.json ./
 COPY --from=builder /app/backend/prisma ./prisma
+COPY --from=builder /app/backend/src/seed.ts ./src/seed.ts
+COPY backend/scripts/ /app/scripts/
 
 EXPOSE 4000
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node scripts/ensure-seeded.mjs && node dist/index.js"]
